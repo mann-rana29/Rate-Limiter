@@ -38,13 +38,37 @@ public class RateLimiterService {
         Long currCount = redisTemplate.opsForValue().increment(key);
 
         long currCountVal = (currCount != null) ? currCount : 0x0L;
-        long remainingTimeVal = (remainingTime != null && remainingTime < 0)? remainingTime : 0x0L;
+        long remainingTimeVal = (remainingTime != null && remainingTime > 0)? remainingTime : 0x0L;
         long remainingRequests = (maxRequests - currCountVal < 0) ? 0 : maxRequests - currCountVal;
 
         boolean allowed = maxRequests >= currCountVal;
 
         return new RateLimitStatus(allowed,remainingTimeVal,(int) remainingRequests);
 
+    }
+
+    public int getRemainingRequests(String apiKey){
+        long currentTimestamp = java.time.Instant.now().getEpochSecond();
+
+        long windowId = currentTimestamp/windowSeconds;
+
+        String key = "rate:fixed:" + apiKey + ":" + windowId ;
+
+        String currCountStr  = redisTemplate.opsForValue().get(key);
+
+        if(currCountStr == null) return 0;
+
+        return Integer.parseInt(currCountStr);
+    }
+
+    public void resetRateLimit(String apiKey){
+        long currentTimestamp = java.time.Instant.now().getEpochSecond();
+
+        long windowId = currentTimestamp/windowSeconds;
+
+        String key = "rate:fixed:" + apiKey + ":" + windowId ;
+
+        redisTemplate.delete(key);
     }
 
 }

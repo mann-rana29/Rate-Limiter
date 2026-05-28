@@ -14,6 +14,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public  void addInterceptors(InterceptorRegistry registry){
-        registry.addInterceptor(rateLimitInterceptor).addPathPatterns("/test/**");
+        registry.addInterceptor(rateLimitInterceptor).addPathPatterns("/test/**").excludePathPatterns("/admin/**");
     }
 }
