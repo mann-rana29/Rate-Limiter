@@ -1,8 +1,8 @@
 package main.rate_limiter.Services;
 
+import main.rate_limiter.Models.RateLimitStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -19,7 +19,7 @@ public class RateLimiterService {
     @Value("${rate-limiter.max-requests}")
     private int  maxRequests;
 
-    public boolean isAllowedFixedWindow(String apiKey){
+    public RateLimitStatus isAllowedFixedWindow(String apiKey){
         long currentTimestamp = java.time.Instant.now().getEpochSecond();
 
         long windowId = currentTimestamp/windowSeconds;
@@ -30,13 +30,21 @@ public class RateLimiterService {
                 key, "1" , Duration.ofSeconds(windowSeconds)
         );
 
-        if(isNewWindow != null && isNewWindow) return true;
+        if(isNewWindow != null && isNewWindow){
+            return new RateLimitStatus(true,windowSeconds,maxRequests-1);
+        }
 
+        Long remainingTime = redisTemplate.getExpire(key);
         Long currCount = redisTemplate.opsForValue().increment(key);
 
-        if(currCount != null && currCount > maxRequests) return false;
+        long currCountVal = (currCount != null) ? currCount : 0x0L;
+        long remainingTimeVal = (remainingTime != null && remainingTime < 0)? remainingTime : 0x0L;
+        long remainingRequests = (maxRequests - currCountVal < 0) ? 0 : maxRequests - currCountVal;
 
-        return true;
+        boolean allowed = maxRequests >= currCountVal;
+
+        return new RateLimitStatus(allowed,remainingTimeVal,(int) remainingRequests);
 
     }
+
 }
