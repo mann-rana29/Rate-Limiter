@@ -25,7 +25,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        RateLimitStatus rateLimitStatus = rateLimiterService.isAllowedFixedWindow(apiKey);
+        RateLimitStatus rateLimitStatus = rateLimiterService.isAllowedSlidingWindow(apiKey);
 
         response.setHeader("X-RateLimit-Limit","10");
         response.setHeader("X-RateLimit-Remaining",String.valueOf(rateLimitStatus.getRemainingRequests()));

@@ -4,14 +4,23 @@ import main.rate_limiter.Models.RateLimitStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.Collections;
+import java.util.UUID;
 
 @Service
 public class RateLimiterService {
-    @Autowired
-    private StringRedisTemplate redisTemplate;
+
+    private final StringRedisTemplate redisTemplate;
+    private final RedisScript<Long> slidingWindowScript;
+
+    public RateLimiterService(StringRedisTemplate redisTemplate, RedisScript<Long> slidingWindowScript){
+        this.redisTemplate =redisTemplate;
+        this.slidingWindowScript = slidingWindowScript;
+    }
 
     @Value("${rate-limiter.window-seconds}")
     private long windowSeconds;
@@ -69,6 +78,32 @@ public class RateLimiterService {
         String key = "rate:fixed:" + apiKey + ":" + windowId ;
 
         redisTemplate.delete(key);
+    }
+
+    public RateLimitStatus isAllowedSlidingWindow(String apiKey){
+        String key = "rate:sliding" + apiKey;
+
+        long nowMs = System.currentTimeMillis();
+        long windowMs = windowSeconds*1000;
+        String requestId = UUID.randomUUID().toString();
+
+        Long result = redisTemplate.execute(
+                slidingWindowScript,
+                Collections.singletonList(key),
+                String.valueOf(nowMs),
+                String.valueOf(windowMs),
+                String.valueOf(maxRequests),
+                requestId
+        );
+
+        boolean allowed = (result != null && result == 1);
+
+        Long currCount = redisTemplate.opsForZSet().zCard(key);
+        long currCountVal = (currCount != null) ? currCount : 0L;
+
+        long remainingRequests = (maxRequests - currCountVal > 0) ? maxRequests - currCountVal : 0L;
+
+        return new RateLimitStatus(allowed, 45 ,(int) remainingRequests);
     }
 
 }
