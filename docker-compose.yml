@@ -1,0 +1,32 @@
+version: '3.8'
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis-rate-limiter
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ratelimit-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: springapp-rate-limiter
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - ratelimit-network
+
+volumes:
+  redis_data:
+
+networks:
+  ratelimit-network:
+    driver: bridge
